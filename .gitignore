@@ -12,5 +12,6 @@ src-tauri/target/
 .DS_Store
 Thumbs.db
 
-# Config cache (do NOT commit personal configs)
-.claude/
+# Config cache (keep CLAUDE.md, ignore rest)
+.claude/*
+!.claude/CLAUDE.md
