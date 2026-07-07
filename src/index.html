@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Token Monitor</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- 缩略态：悬浮小条 -->
+    <div id="compact-bar" class="widget-container">
+      <div id="compact-content">
+        <div id="provider-dots"></div>
+        <div id="compact-ring">
+          <svg viewBox="0 0 40 40">
+            <circle class="ring-bg" cx="20" cy="20" r="16"/>
+            <circle class="ring-fill" cx="20" cy="20" r="16"/>
+          </svg>
+          <span id="compact-pct">--</span>
+        </div>
+        <button id="btn-settings-compact" title="设置">&#9881;</button>
+      </div>
+    </div>
+
+    <!-- 展开态：详情面板 -->
+    <div id="expanded-panel" class="widget-container hidden">
+      <div id="expanded-content">
+        <div id="provider-cards"></div>
+        <div class="panel-footer">
+          <button id="btn-settings">&#9881; 设置</button>
+          <button id="btn-collapse">&#9650; 折叠</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 设置态 -->
+    <div id="settings-panel" class="widget-container hidden">
+      <div id="settings-content">
+        <div class="settings-header">
+          <span>Provider 管理</span>
+          <button id="btn-add-provider" class="btn-primary">+ 添加</button>
+        </div>
+        <div id="provider-list"></div>
+
+        <!-- 编辑器 -->
+        <div id="provider-editor" class="hidden">
+          <div class="editor-title">编辑 Provider</div>
+          <div class="field-row">
+            <div class="field">
+              <label>名称</label>
+              <input id="ed-name" placeholder="OpenCode Go" />
+            </div>
+            <div class="field" style="flex:0 0 60px">
+              <label>颜色</label>
+              <input id="ed-color" type="color" value="#6c5ce7" />
+            </div>
+            <div class="field">
+              <label>类型</label>
+              <select id="ed-type">
+                <option value="opencode">OpenCode Go</option>
+                <option value="json">自定义 JSON API</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="opencode-fields" class="hidden">
+            <p class="hint">使用 opencli 自动抓取 opencode.ai 工作区的用量数据</p>
+            <p class="hint">依赖：<code>npm install -g opencli</code></p>
+          </div>
+
+          <div id="json-fields">
+            <div class="field">
+              <label>API URL</label>
+              <input id="ed-url" placeholder="https://api.example.com/usage" />
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label>单位</label>
+                <select id="ed-unit">
+                  <option value="usd">USD ($)</option>
+                  <option value="tokens">Tokens</option>
+                  <option value="requests">Requests</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>轮询间隔 (秒)</label>
+                <input id="ed-interval" type="number" min="10" value="60" />
+              </div>
+            </div>
+            <div class="field">
+              <label>JSON Path — used (已用)</label>
+              <input id="ed-jp-used" placeholder="$.data.total_usage" class="mono" />
+            </div>
+            <div class="field">
+              <label>JSON Path — total (总量)</label>
+              <input id="ed-jp-total" placeholder="$.data.hard_limit" class="mono" />
+            </div>
+            <div class="field">
+              <label>JSON Path — remaining (剩余)</label>
+              <input id="ed-jp-remaining" placeholder="$.data.remaining" class="mono" />
+            </div>
+            <div class="field">
+              <label>JSON Path — percentage (百分比)</label>
+              <input id="ed-jp-pct" placeholder="$.data.usage_pct" class="mono" />
+            </div>
+            <p class="hint">提示：提供 used+total 即可自动计算 remaining 和 percentage</p>
+          </div>
+
+          <div class="editor-buttons">
+            <button id="ed-cancel" class="btn-secondary">取消</button>
+            <button id="ed-save" class="btn-primary">保存</button>
+          </div>
+        </div>
+
+        <div class="settings-footer">
+          <button id="btn-settings-close" class="btn-primary">完成</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+[env]
+CC = "F:/xiazai/x86_64-14.2.0-release-posix-seh-msvcrt-rt_v12-rev2/mingw64/bin/gcc.exe"
+
+[target.x86_64-pc-windows-gnu]
+linker = "F:/xiazai/x86_64-14.2.0-release-posix-seh-msvcrt-rt_v12-rev2/mingw64/bin/gcc.exe"
+ar = "F:/xiazai/x86_64-14.2.0-release-posix-seh-msvcrt-rt_v12-rev2/mingw64/bin/ar.exe"

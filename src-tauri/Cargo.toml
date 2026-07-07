@@ -1,0 +1,27 @@
+[package]
+name = "llm-token-monitor"
+version = "2.0.0"
+description = "Lightweight desktop widget for monitoring LLM token balances"
+edition = "2021"
+rust-version = "1.70"
+
+[lib]
+name = "llm_token_monitor_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0", features = ["tray-icon"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+once_cell = "1.19"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
