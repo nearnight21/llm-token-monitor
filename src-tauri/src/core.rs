@@ -129,16 +129,37 @@ fn pd(pct: f64, limit: f64) -> PeriodData {
 }
 
 fn fetch_opencode_data() -> Result<(PeriodData, PeriodData, PeriodData), String> {
-    let _ = run_opencli(&["browser", "sess_opencode", "close"]);
+    let _ = run_opencli(&["browser", "sess_opencode", "--window", "background", "close"]);
     std::thread::sleep(std::time::Duration::from_millis(500));
-    run_opencli(&["browser", "sess_opencode", "open", "--window", "background", WORKSPACE_URL])?;
-    std::thread::sleep(std::time::Duration::from_secs(5));
-    let text = run_opencli(&["browser", "sess_opencode", "eval", "document.body.innerText"])?;
-    let preview: String = text.chars().take(300).collect();
+    run_opencli(&["browser", "sess_opencode", "--window", "background", "open", WORKSPACE_URL])?;
+    std::thread::sleep(std::time::Duration::from_secs(10));
+    let text = run_opencli(&["browser", "sess_opencode", "--window", "background", "eval", "document.body.innerText"])?;
+
+    // Save full page text to debug file
+    let debug_path = config_path().parent().map(|p| p.join("page_debug.txt")).unwrap_or_else(|| {
+        std::path::PathBuf::from(r"C:\Users\Default\AppData\Roaming\llm-token-monitor\page_debug.txt")
+    });
+    fs::write(&debug_path, &text).ok();
+
+    // Try multiple label variations
+    let pct_h = parse_pct(&text, "滚动用量")
+        .or_else(|| parse_pct(&text, "用量"))
+        .or_else(|| parse_pct(&text, "Rolling"))
+        .or_else(|| parse_pct(&text, "rolling"))
+        .or_else(|| parse_pct(&text, "Hourly"))
+        .or_else(|| parse_pct(&text, "hourly"));
+    let pct_w = parse_pct(&text, "每周用量")
+        .or_else(|| parse_pct(&text, "Weekly"))
+        .or_else(|| parse_pct(&text, "weekly"));
+    let pct_m = parse_pct(&text, "每月用量")
+        .or_else(|| parse_pct(&text, "Monthly"))
+        .or_else(|| parse_pct(&text, "monthly"));
+
+    let preview: String = text.chars().take(1000).collect();
     Ok((
-        pd(parse_pct(&text, "滚动用量").ok_or_else(|| format!("hourly parse fail. Page: {}", preview))?, HOURLY_LIMIT),
-        pd(parse_pct(&text, "每周用量").ok_or_else(|| "weekly parse fail".to_string())?, WEEKLY_LIMIT),
-        pd(parse_pct(&text, "每月用量").ok_or_else(|| "monthly parse fail".to_string())?, MONTHLY_LIMIT),
+        pd(pct_h.ok_or_else(|| format!("hourly parse fail. Page preview:\n{}", preview))?, HOURLY_LIMIT),
+        pd(pct_w.ok_or_else(|| format!("weekly parse fail. Page preview:\n{}", preview))?, WEEKLY_LIMIT),
+        pd(pct_m.ok_or_else(|| format!("monthly parse fail. Page preview:\n{}", preview))?, MONTHLY_LIMIT),
     ))
 }
 

@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "LLM Token Monitor",
-  "version": "2.0.0",
+  "version": "1.1.0",
   "identifier": "com.llm-token-monitor",
   "build": {
     "frontendDist": "../src"
