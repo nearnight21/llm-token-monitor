@@ -68,7 +68,7 @@ static CONFIG: Lazy<Mutex<AppConfig>> = Lazy::new(|| Mutex::new(AppConfig::defau
 const HOURLY_LIMIT: f64 = 12.0;
 const WEEKLY_LIMIT: f64 = 30.0;
 const MONTHLY_LIMIT: f64 = 60.0;
-const WORKSPACE_URL: &str = "https://opencode.ai/workspace/wrk_01KVSRHRPBSQ74DFKHGB4N6E7D/go";
+const WORKSPACE_URL: &str = "https://opencode.ai/workspace/wrk_01KX7RRJX7V0A58NS9SESWNC48/go";
 
 fn config_path() -> PathBuf {
     let appdata = std::env::var("APPDATA").unwrap_or_else(|_| r"C:\Users\Default\AppData\Roaming".into());
@@ -129,16 +129,23 @@ fn pd(pct: f64, limit: f64) -> PeriodData {
 }
 
 fn fetch_opencode_data() -> Result<(PeriodData, PeriodData, PeriodData), String> {
-    let _ = run_opencli(&["browser", "sess_opencode", "close"]);
-    std::thread::sleep(std::time::Duration::from_millis(500));
-    run_opencli(&["browser", "sess_opencode", "open", "--window", "background", WORKSPACE_URL])?;
-    std::thread::sleep(std::time::Duration::from_secs(5));
-    let text = run_opencli(&["browser", "sess_opencode", "eval", "document.body.innerText"])?;
+    // 先尝试直接 eval，检查是否打开的不是空白页
+    let text = run_opencli(&["browser", "sess_opencode", "eval", "document.body.innerText"])
+        .and_then(|t| {
+            if t.contains("Rolling Usage") || t.contains("滚动用量") { Ok(t) }
+            else { Err("page is blank or stale".into()) }
+        })
+        .or_else(|_| {
+            // session 无效 → 重新打开 workspace 页面
+            run_opencli(&["browser", "sess_opencode", "open", WORKSPACE_URL])?;
+            std::thread::sleep(std::time::Duration::from_secs(5));
+            run_opencli(&["browser", "sess_opencode", "eval", "document.body.innerText"])
+        })?;
     let preview: String = text.chars().take(300).collect();
     Ok((
-        pd(parse_pct(&text, "滚动用量").ok_or_else(|| format!("hourly parse fail. Page: {}", preview))?, HOURLY_LIMIT),
-        pd(parse_pct(&text, "每周用量").ok_or_else(|| "weekly parse fail".to_string())?, WEEKLY_LIMIT),
-        pd(parse_pct(&text, "每月用量").ok_or_else(|| "monthly parse fail".to_string())?, MONTHLY_LIMIT),
+        pd(parse_pct(&text, "Rolling Usage").or_else(|| parse_pct(&text, "滚动用量")).ok_or_else(|| format!("hourly parse fail. Page: {}", preview))?, HOURLY_LIMIT),
+        pd(parse_pct(&text, "Weekly Usage").or_else(|| parse_pct(&text, "每周用量")).ok_or_else(|| "weekly parse fail".to_string())?, WEEKLY_LIMIT),
+        pd(parse_pct(&text, "Monthly Usage").or_else(|| parse_pct(&text, "每月用量")).ok_or_else(|| "monthly parse fail".to_string())?, MONTHLY_LIMIT),
     ))
 }
 
