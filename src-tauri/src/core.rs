@@ -68,7 +68,6 @@ static CONFIG: Lazy<Mutex<AppConfig>> = Lazy::new(|| Mutex::new(AppConfig::defau
 const HOURLY_LIMIT: f64 = 12.0;
 const WEEKLY_LIMIT: f64 = 30.0;
 const MONTHLY_LIMIT: f64 = 60.0;
-const WORKSPACE_URL: &str = "https://opencode.ai/workspace/wrk_01KX7RRJX7V0A58NS9SESWNC48/go";
 
 fn config_path() -> PathBuf {
     let appdata = std::env::var("APPDATA").unwrap_or_else(|_| r"C:\Users\Default\AppData\Roaming".into());
@@ -82,7 +81,8 @@ fn default_providers() -> Vec<Provider> {
         id: "opencode-go".into(), name: "OpenCode Go".into(),
         provider_type: "opencode".into(), enabled: true,
         color: "#6c5ce7".into(), unit: "usd".into(),
-        api_url: None, json_paths: None, polling_interval_ms: 60000,
+        api_url: Some("https://opencode.ai/workspace/wrk_01KX7RRJX7V0A58NS9SESWNC48/go".into()),
+        json_paths: None, polling_interval_ms: 60000,
     }]
 }
 
@@ -128,7 +128,7 @@ fn pd(pct: f64, limit: f64) -> PeriodData {
     PeriodData { used: u, total: limit, remaining: limit - u, percentage: pct }
 }
 
-fn fetch_opencode_data() -> Result<(PeriodData, PeriodData, PeriodData), String> {
+fn fetch_opencode_data(workspace_url: &str) -> Result<(PeriodData, PeriodData, PeriodData), String> {
     // 先关闭旧 session 确保每次都刷新页面拿到最新数据
     let _ = run_opencli(&["browser", "sess_opencode", "--window", "background", "close"]);
     std::thread::sleep(std::time::Duration::from_millis(500));
@@ -141,7 +141,7 @@ fn fetch_opencode_data() -> Result<(PeriodData, PeriodData, PeriodData), String>
         })
         .or_else(|_| {
             // session 无效 → 重新打开 workspace 页面
-            run_opencli(&["browser", "sess_opencode", "--window", "background", "open", WORKSPACE_URL])?;
+            run_opencli(&["browser", "sess_opencode", "--window", "background", "open", workspace_url])?;
             std::thread::sleep(std::time::Duration::from_secs(5));
             run_opencli(&["browser", "sess_opencode", "--window", "background", "eval", "document.body.innerText"])
         })?;
@@ -198,8 +198,9 @@ fn fetch_custom_data(p: &Provider) -> Result<UsageData, String> {
 // ---- Commands ----
 
 #[tauri::command]
-pub async fn fetch_opencode_go() -> Result<UsageData, String> {
-    let (h, w, m) = fetch_opencode_data()?;
+pub async fn fetch_opencode_go(provider: Provider) -> Result<UsageData, String> {
+    let url = provider.api_url.as_deref().unwrap_or("https://opencode.ai/go");
+    let (h, w, m) = fetch_opencode_data(url)?;
     Ok(UsageData {
         provider_id: "opencode-go".into(), provider_name: "OpenCode Go".into(),
         provider_type: "opencode".into(), unit: "usd".into(), color: "#6c5ce7".into(),

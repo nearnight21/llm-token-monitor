@@ -201,6 +201,8 @@ function openEditor(index) {
   const isOC = p.provider_type === 'opencode';
   $('opencode-fields').classList.toggle('hidden', !isOC);
   $('json-fields').classList.toggle('hidden', isOC);
+  $('ed-url-label').textContent = isOC ? 'Workspace URL' : 'API URL';
+  $('ed-url').placeholder = isOC ? 'https://opencode.ai/workspace/wrk_xxx/go' : 'https://api.example.com/usage';
 }
 
 function closeEditor() { providerEditor.classList.add('hidden'); editingProvider = null; }
@@ -220,7 +222,7 @@ function saveEditor() {
     id: editingProvider >= 0 ? providers[editingProvider].id : `p-${Date.now()}`,
     name, color, provider_type: type, enabled: true, unit,
     polling_interval_ms: interval * 1000,
-    api_url: type === 'opencode' ? null : url,
+    api_url: url || null,
     json_paths: type === 'opencode' ? null : jp,
   };
   if (editingProvider >= 0) providers[editingProvider] = provider;
@@ -243,7 +245,7 @@ async function saveAndRestart() {
 async function pollProvider(p) {
   try {
     providerData[p.id] = p.provider_type === 'opencode'
-      ? await invoke('fetch_opencode_go')
+      ? await invoke('fetch_opencode_go', { provider: p })
       : await invoke('fetch_custom_api', { provider: p });
   } catch (err) {
     providerData[p.id] = { error: String(err), provider_id: p.id, provider_name: p.name, provider_type: p.provider_type, color: p.color, unit: p.unit };
@@ -277,6 +279,8 @@ $('ed-type').onchange = e => {
   const isOC = e.target.value === 'opencode';
   $('opencode-fields').classList.toggle('hidden', !isOC);
   $('json-fields').classList.toggle('hidden', isOC);
+  $('ed-url-label').textContent = isOC ? 'Workspace URL' : 'API URL';
+  $('ed-url').placeholder = isOC ? 'https://opencode.ai/workspace/wrk_xxx/go' : 'https://api.example.com/usage';
 };
 
 settingsPanel.addEventListener('mouseenter', () => clearTimeout(collapseTimer));
