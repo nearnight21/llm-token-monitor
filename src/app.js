@@ -238,7 +238,7 @@ function deleteProvider(i) {
 }
 
 async function saveAndRestart() {
-  try { await invoke('save_config', { providers, window: null }); pollAll(); } catch (e) { alert('保存失败: ' + e); }
+  try { await invoke('save_config', { providers, window: null }); setupPolling(); } catch (e) { alert('保存失败: ' + e); }
 }
 
 // ===== 数据轮询 =====

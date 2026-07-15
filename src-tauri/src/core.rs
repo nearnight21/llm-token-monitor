@@ -3,8 +3,6 @@ use std::process::Command;
 use std::os::windows::process::CommandExt;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::Mutex;
-use once_cell::sync::Lazy;
 
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
@@ -63,8 +61,6 @@ pub struct AppConfig {
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct WindowState { pub x: i32, pub y: i32 }
 
-static CONFIG: Lazy<Mutex<AppConfig>> = Lazy::new(|| Mutex::new(AppConfig::default()));
-
 const HOURLY_LIMIT: f64 = 12.0;
 const WEEKLY_LIMIT: f64 = 30.0;
 const MONTHLY_LIMIT: f64 = 60.0;
@@ -81,7 +77,7 @@ fn default_providers() -> Vec<Provider> {
         id: "opencode-go".into(), name: "OpenCode Go".into(),
         provider_type: "opencode".into(), enabled: true,
         color: "#6c5ce7".into(), unit: "usd".into(),
-        api_url: Some("https://opencode.ai/workspace/wrk_01KX7RRJX7V0A58NS9SESWNC48/go".into()),
+        api_url: None,
         json_paths: None, polling_interval_ms: 60000,
     }]
 }
@@ -129,22 +125,12 @@ fn pd(pct: f64, limit: f64) -> PeriodData {
 }
 
 fn fetch_opencode_data(workspace_url: &str) -> Result<(PeriodData, PeriodData, PeriodData), String> {
-    // 先关闭旧 session 确保每次都刷新页面拿到最新数据
+    // close + open + eval：每次都强制打开新页面，拿到最新数据
     let _ = run_opencli(&["browser", "sess_opencode", "--window", "background", "close"]);
     std::thread::sleep(std::time::Duration::from_millis(500));
-
-    // 先尝试直接 eval，检查是否打开的不是空白页
-    let text = run_opencli(&["browser", "sess_opencode", "--window", "background", "eval", "document.body.innerText"])
-        .and_then(|t| {
-            if t.contains("Rolling Usage") || t.contains("滚动用量") { Ok(t) }
-            else { Err("page is blank or stale".into()) }
-        })
-        .or_else(|_| {
-            // session 无效 → 重新打开 workspace 页面
-            run_opencli(&["browser", "sess_opencode", "--window", "background", "open", workspace_url])?;
-            std::thread::sleep(std::time::Duration::from_secs(5));
-            run_opencli(&["browser", "sess_opencode", "--window", "background", "eval", "document.body.innerText"])
-        })?;
+    run_opencli(&["browser", "sess_opencode", "--window", "background", "open", workspace_url])?;
+    std::thread::sleep(std::time::Duration::from_secs(8));
+    let text = run_opencli(&["browser", "sess_opencode", "--window", "background", "eval", "document.body.innerText"])?;
     let preview: String = text.chars().take(300).collect();
     Ok((
         pd(parse_pct(&text, "Rolling Usage").or_else(|| parse_pct(&text, "滚动用量")).ok_or_else(|| format!("hourly parse fail. Page: {}", preview))?, HOURLY_LIMIT),
@@ -202,8 +188,11 @@ pub async fn fetch_opencode_go(provider: Provider) -> Result<UsageData, String> 
     let url = provider.api_url.as_deref().unwrap_or("https://opencode.ai/go");
     let (h, w, m) = fetch_opencode_data(url)?;
     Ok(UsageData {
-        provider_id: "opencode-go".into(), provider_name: "OpenCode Go".into(),
-        provider_type: "opencode".into(), unit: "usd".into(), color: "#6c5ce7".into(),
+        provider_id: provider.id.clone(),
+        provider_name: provider.name.clone(),
+        provider_type: provider.provider_type.clone(),
+        unit: provider.unit.clone(),
+        color: provider.color.clone(),
         hourly: Some(h.clone()), weekly: Some(w.clone()), monthly: Some(m.clone()),
         percentage: Some(h.percentage), used: Some(h.used),
         total: Some(h.total), remaining: Some(h.remaining), error: None,
@@ -217,9 +206,7 @@ pub async fn fetch_custom_api(provider: Provider) -> Result<UsageData, String> {
 pub fn save_config(providers: Vec<Provider>, window: Option<WindowState>) -> Result<(), String> {
     let cfg = AppConfig { providers, window };
     fs::write(config_path(), serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())?;
-    if let Ok(mut c) = CONFIG.lock() { *c = cfg; }
-    Ok(())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -232,7 +219,6 @@ pub fn load_config() -> Result<AppConfig, String> {
     }
     let cfg: AppConfig = serde_json::from_str(&fs::read_to_string(&path).map_err(|e| e.to_string())?)
         .unwrap_or_else(|_| AppConfig { providers: default_providers(), window: None });
-    if let Ok(mut c) = CONFIG.lock() { *c = cfg.clone(); }
     Ok(cfg)
 }
 
