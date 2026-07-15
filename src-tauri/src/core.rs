@@ -129,17 +129,21 @@ fn pd(pct: f64, limit: f64) -> PeriodData {
 }
 
 fn fetch_opencode_data() -> Result<(PeriodData, PeriodData, PeriodData), String> {
+    // 先关闭旧 session 确保每次都刷新页面拿到最新数据
+    let _ = run_opencli(&["browser", "sess_opencode", "--window", "background", "close"]);
+    std::thread::sleep(std::time::Duration::from_millis(500));
+
     // 先尝试直接 eval，检查是否打开的不是空白页
-    let text = run_opencli(&["browser", "sess_opencode", "eval", "document.body.innerText"])
+    let text = run_opencli(&["browser", "sess_opencode", "--window", "background", "eval", "document.body.innerText"])
         .and_then(|t| {
             if t.contains("Rolling Usage") || t.contains("滚动用量") { Ok(t) }
             else { Err("page is blank or stale".into()) }
         })
         .or_else(|_| {
             // session 无效 → 重新打开 workspace 页面
-            run_opencli(&["browser", "sess_opencode", "open", WORKSPACE_URL])?;
+            run_opencli(&["browser", "sess_opencode", "--window", "background", "open", WORKSPACE_URL])?;
             std::thread::sleep(std::time::Duration::from_secs(5));
-            run_opencli(&["browser", "sess_opencode", "eval", "document.body.innerText"])
+            run_opencli(&["browser", "sess_opencode", "--window", "background", "eval", "document.body.innerText"])
         })?;
     let preview: String = text.chars().take(300).collect();
     Ok((
